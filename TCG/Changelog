@@ -1,3 +1,7 @@
+0.1.6
+	Removed a correction for an old off-by-one coordinate bug.
+	Deduct cost before summoning, instead of after.
+
 0.1.5
 	Summonings are now animated.
 

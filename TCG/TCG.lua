@@ -227,21 +227,20 @@ function randomUnit()
 
    -- If the side has no leader, do nothing.
    elseif leader then
-      -- Don't know why I have to add 1 to these coordinates...
-      local x, y = wesnoth.find_vacant_tile(leader.x + 1, leader.y + 1)
+      local x, y = wesnoth.find_vacant_tile(leader.x, leader.y)
 
       W.set_variable{name = 'typeN', rand = '1..'..#unitTypeList}
       local type = unitTypeList[WV.typeN]
       WV.typeN = nil
+
+      local cost = wesnoth.get_unit_type(type).cost
+      side.gold = side.gold - cost
 
       W.unit{x = x, y = y,
 	     side = WV.side_number,
 	     type = type,
 	     animate = true,
 	     moves = 0}
-
-      local cost = wesnoth.get_unit_type(type).cost
-      side.gold = side.gold - cost
    end
 end
 
