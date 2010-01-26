@@ -212,52 +212,75 @@ minimumGold = 5
 minimumGoldHelp =
    'You must have at least '..minimumGold..' gold to summon a unit.'
 
---! @returns leader for the current side.
+--! @return leader for the current side.
 local function getLeader()
    return wesnoth.get_units({side = WV.side_number, canrecruit = true})[1]
 end
 
-function randomUnit()
+--! 0: Successful summon
+--! 1: Insufficient gold
+--! 2: Leader not on keep
+--! 3: No leader
+local function randomUnit()
    local side = wesnoth.get_side(WV.side_number)
    local leader = getLeader()
 
    if side.gold < minimumGold then
-      W.message{speaker = 'narrator', side_for = WV.side_number,
-		message = minimumGoldHelp}
+      return 1
 
-   -- If the side has no leader, do nothing.
-   elseif leader then
-      local x, y = wesnoth.find_vacant_tile(leader.x, leader.y)
+   elseif not leader then
+      return 3
 
-      W.set_variable{name = 'typeN', rand = '1..'..#unitTypeList}
-      local type = unitTypeList[WV.typeN]
-      WV.typeN = nil
+   else
+      local terrain = wesnoth.get_terrain(leader.x, leader.y)
 
-      local cost = wesnoth.get_unit_type(type).cost
-      side.gold = side.gold - cost
+      -- I'm assuming that terrain is a keep iff it starts with 'K'.
+      if terrain:sub(1,1) ~= 'K' then
+	 return 2
 
-      W.unit{x = x, y = y,
-	     side = WV.side_number,
-	     type = type,
-	     animate = true,
-	     moves = 0}
+      else
+	 local x, y = wesnoth.find_vacant_tile(leader.x, leader.y)
+
+	 W.set_variable{name = 'typeN', rand = '1..'..#unitTypeList}
+	 local type = unitTypeList[WV.typeN]
+	 WV.typeN = nil
+
+	 local cost = wesnoth.get_unit_type(type).cost
+	 side.gold = side.gold - cost
+
+	 W.unit{x = x, y = y,
+		side = WV.side_number,
+		type = type,
+		animate = true,
+		moves = 0}
+
+	 return 0
+      end
    end
 end
 
-wesnoth.register_wml_action('random_unit', randomUnit)
-
-wesnoth.register_wml_action('auto_random_unit', function()
-   local side = wesnoth.get_side(WV.side_number)
-
-   if getLeader() then
-      while side.gold >= minimumGold do
-	 randomUnit()
-      end
+wesnoth.register_wml_action('summon', function()
+   error = randomUnit()
+   if error == 1 then
+      W.message{speaker = 'narrator', side_for = WV.side_number,
+		message = minimumGoldHelp}
+   elseif error == 2 then
+      W.message{speaker = 'narrator', side_for = WV.side_number,
+		message = 'Your leader must be on a keep to summon a unit.'}
+   elseif error == 3 then
+      W.message{speaker = 'narrator', side_for = WV.side_number,
+		message = 'You have no leader.'}
+   elseif error ~= 0 then
+      wesnoth.message('Unknown summoning error')
    end
+end)
+
+wesnoth.register_wml_action('auto_summon', function()
+   while randomUnit() == 0 do end
 end)
 
 wesnoth.register_wml_action('help', function()
    W.message{speaker = 'narrator',
 	     side_for = WV.side_number,
-	     message = 'Right-click and choose the "Summon" command. A unit will appear next to your leader. You will be charged the cost of the unit that appears. '..minimumGoldHelp..' Remember to summon as much as possible!'}
+	     message = 'While your leader is on a keep, right-click and choose the "Summon" command. A unit will appear next to your leader. You will be charged the cost of the unit that appears. '..minimumGoldHelp}
 end)

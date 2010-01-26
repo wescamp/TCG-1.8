@@ -1,9 +1,12 @@
+0.2.0
+	Leader must now be on a keep to summon.
+
 0.1.6
 	Removed a correction for an old off-by-one coordinate bug.
 	Deduct cost before summoning, instead of after.
 
 0.1.5
-	Summonings are now animated.
+	Summonings are now animated. scroll_to is no longer necesary.
 
 0.1.4
 	Use set_wml_action_metatable and set_wml_var_metatable to trim the code.
