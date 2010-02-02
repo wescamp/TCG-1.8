@@ -1,3 +1,13 @@
+0.4.1
+	Made RecruitList:remove() error message more explicit.
+
+0.4.0
+	Now with real live recruit lists!
+
+0.3.0
+	Leader will now automatically summon when starting a turn on a keep or
+	moving to a keep.
+
 0.2.0
 	Leader must now be on a keep to summon.
 

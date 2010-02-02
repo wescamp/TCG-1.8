@@ -208,79 +208,63 @@ local unitTypeList = {
    'Fire Dragon',
 }
 
-minimumGold = 5
-minimumGoldHelp =
-   'You must have at least '..minimumGold..' gold to summon a unit.'
+recruitListSize = 6
 
---! @return leader for the current side.
-local function getLeader()
-   return wesnoth.get_units({side = WV.side_number, canrecruit = true})[1]
+local RecruitList = {}
+
+function RecruitList:new()
+   local o = {}
+   setmetatable(o, self)
+   self.__index = self
+   return o
 end
 
---! 0: Successful summon
---! 1: Insufficient gold
---! 2: Leader not on keep
---! 3: No leader
-local function randomUnit()
-   local side = wesnoth.get_side(WV.side_number)
-   local leader = getLeader()
-
-   if side.gold < minimumGold then
-      return 1
-
-   elseif not leader then
-      return 3
-
-   else
-      local terrain = wesnoth.get_terrain(leader.x, leader.y)
-
-      -- I'm assuming that terrain is a keep iff it starts with 'K'.
-      if terrain:sub(1,1) ~= 'K' then
-	 return 2
-
-      else
-	 local x, y = wesnoth.find_vacant_tile(leader.x, leader.y)
-
-	 W.set_variable{name = 'typeN', rand = '1..'..#unitTypeList}
-	 local type = unitTypeList[WV.typeN]
-	 WV.typeN = nil
-
-	 local cost = wesnoth.get_unit_type(type).cost
-	 side.gold = side.gold - cost
-
-	 W.unit{x = x, y = y,
-		side = WV.side_number,
-		type = type,
-		animate = true,
-		moves = 0}
-
-	 return 0
+function RecruitList:set()
+   local recruit = ''
+   for i = 1, recruitListSize do
+      local type = self[i]
+      if type then
+	 recruit = recruit..type..','
       end
    end
+   W.set_recruit{side = WV.side_number, recruit = recruit}
 end
 
-wesnoth.register_wml_action('summon', function()
-   error = randomUnit()
-   if error == 1 then
-      W.message{speaker = 'narrator', side_for = WV.side_number,
-		message = minimumGoldHelp}
-   elseif error == 2 then
-      W.message{speaker = 'narrator', side_for = WV.side_number,
-		message = 'Your leader must be on a keep to summon a unit.'}
-   elseif error == 3 then
-      W.message{speaker = 'narrator', side_for = WV.side_number,
-		message = 'You have no leader.'}
-   elseif error ~= 0 then
-      wesnoth.message('Unknown summoning error')
+function RecruitList:fill()
+   for i = 1, recruitListSize do
+      if not self[i] then
+	 W.set_variable{name = 'typeN', rand = '1..'..#unitTypeList}
+	 self[i] = unitTypeList[WV.typeN]
+      end
    end
+   WV.typeN = nil
+   self:set()
+end
+
+function RecruitList:remove(i)
+   i = i or recruitListSize
+   local type = WV.unit.type
+   if i < 1 then
+      wesnoth.message(
+	 'TCG: RecruitList:remove: '..type..' not on recruit list.')
+   elseif self[i] == type then
+      self[i] = nil
+      self:set()
+   else
+      self:remove(i - 1)
+   end
+end
+
+local recruitLists = {}
+
+wesnoth.register_wml_action('fill_recruit_list', function()
+   local side = WV.side_number
+   if not recruitLists[side] then
+      recruitLists[side] = RecruitList:new()
+   end
+   recruitLists[side]:fill()
 end)
 
-wesnoth.register_wml_action('auto_summon', function()
-   while randomUnit() == 0 do end
-end)
-
-wesnoth.register_wml_action('help', function()
-   W.message{speaker = 'narrator',
-	     side_for = WV.side_number,
-	     message = 'While your leader is on a keep, right-click and choose the "Summon" command. A unit will appear next to your leader. You will be charged the cost of the unit that appears. '..minimumGoldHelp}
+wesnoth.register_wml_action('remove_type', function()
+   recruitLists[WV.side_number]:remove()
 end)
