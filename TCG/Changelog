@@ -1,3 +1,11 @@
+0.5.0
+	Made the default leader Random.
+	Leader list consists of 100 gold and level 5 units.
+	Added new era where you only get 1 recruit at a time.
+
+0.4.2
+	Store recruit list data in WML variables for savegames.
+
 0.4.1
 	Made RecruitList:remove() error message more explicit.
 

@@ -208,26 +208,30 @@ local unitTypeList = {
    'Fire Dragon',
 }
 
-recruitListSize = 6
-
 local RecruitList = {}
 
 function RecruitList:new()
-   local o = {}
-   setmetatable(o, self)
+   local list = {}
+   setmetatable(list, self)
    self.__index = self
-   return o
+   local side = WV.side_number
+   for i = 1, recruitListSize do
+      list[i] = WV['recruitList'..side..'_'..i]
+   end
+   return list
 end
 
 function RecruitList:set()
+   local side = WV.side_number
    local recruit = ''
    for i = 1, recruitListSize do
       local type = self[i]
+      WV['recruitList'..side..'_'..i] = type
       if type then
 	 recruit = recruit..type..','
       end
    end
-   W.set_recruit{side = WV.side_number, recruit = recruit}
+   W.set_recruit{side = side, recruit = recruit}
 end
 
 function RecruitList:fill()
@@ -257,14 +261,39 @@ end
 
 local recruitLists = {}
 
-wesnoth.register_wml_action('fill_recruit_list', function()
+local function confirmList()
    local side = WV.side_number
    if not recruitLists[side] then
       recruitLists[side] = RecruitList:new()
    end
-   recruitLists[side]:fill()
-end)
+end
 
-wesnoth.register_wml_action('remove_type', function()
+local function removeType()
+   confirmList()
    recruitLists[WV.side_number]:remove()
-end)
+end
+
+wesnoth.register_wml_action(
+   'set_recruit_list_size',
+   function(cfg)
+      recruitListSize = cfg.n
+   end
+)
+
+wesnoth.register_wml_action(
+   'fill_recruit_list',
+   function()
+      confirmList()
+      recruitLists[WV.side_number]:fill()
+   end
+)
+
+wesnoth.register_wml_action('remove_type', removeType)
+
+wesnoth.register_wml_action(
+   'replace_type',
+   function()
+      removeType()
+      recruitLists[WV.side_number]:fill()
+   end
+)
