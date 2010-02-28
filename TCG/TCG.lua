@@ -1,8 +1,10 @@
+--TCG.lua - Provides tags for use in TCG eras
+
 H = wesnoth.require "lua/helper.lua"
-W = H.set_wml_action_metatable{} -- Treats tags as callable functions.
+W = H.set_wml_action_metatable{} --Treats tags as callable functions.
 _ = wesnoth.textdomain "tcg"
 
-WV = H.set_wml_var_metatable{} -- Contains WML variables.
+V = H.set_wml_var_metatable{} --Contains WML variables.
 
 local unitTypeList = {
    'Vampire Bat',
@@ -210,47 +212,55 @@ local unitTypeList = {
 
 local RecruitList = {}
 
+--This is a proxy for Wesnoth's recruit list that has a fixed length and allows
+--duplicates. Every time it changes, it will be copied to the current side's
+--real recruit list and to WML variables. If this is a savegame, new() will
+--restore data from WML variables. Otherwise, all entries will be nil.
 function RecruitList:new()
    local list = {}
    setmetatable(list, self)
    self.__index = self
-   local side = WV.side_number
+   local side = V.side_number
    for i = 1, recruitListSize do
-      list[i] = WV['recruitList'..side..'_'..i]
+      list[i] = V['recruitList' .. side .. '_' .. i]
    end
    return list
 end
 
+--Copies self to the Wesnoth recruit list and to WML variables.
 function RecruitList:set()
-   local side = WV.side_number
+   local side = V.side_number
    local recruit = ''
    for i = 1, recruitListSize do
       local type = self[i]
-      WV['recruitList'..side..'_'..i] = type
+      V['recruitList' .. side .. '_' .. i] = type
       if type then
-	 recruit = recruit..type..','
+	 recruit = recruit .. type .. ','
       end
    end
    W.set_recruit{side = side, recruit = recruit}
 end
 
+--Fills all empty slots with randomly selected types from unitTypeList.
 function RecruitList:fill()
    for i = 1, recruitListSize do
       if not self[i] then
-	 W.set_variable{name = 'typeN', rand = '1..'..#unitTypeList}
-	 self[i] = unitTypeList[WV.typeN]
+	 W.set_variable{name = 'typeN', rand = '1..' .. #unitTypeList}
+	 self[i] = unitTypeList[V.typeN]
       end
    end
-   WV.typeN = nil
+   V.typeN = nil
    self:set()
 end
 
+--Removes one instance of V.unit.type from self.
+--i: Used only in recursion.
 function RecruitList:remove(i)
    i = i or recruitListSize
-   local type = WV.unit.type
+   local type = V.unit.type
    if i < 1 then
       wesnoth.message(
-	 'TCG: RecruitList:remove: '..type..' not on recruit list.')
+	 'TCG: RecruitList:remove: ' .. type .. ' not on recruit list')
    elseif self[i] == type then
       self[i] = nil
       self:set()
@@ -259,41 +269,67 @@ function RecruitList:remove(i)
    end
 end
 
+function RecruitList:__tostring()
+   local result = ''
+   for i = 1, recruitListSize do
+      local type = self[i] or ''
+      result = result .. i .. ': ' .. type .. "\n"
+   end
+   return result
+end
+
 local recruitLists = {}
 
+--If the current side doesn't have a RecruitList, make a new one.
 local function confirmList()
-   local side = WV.side_number
+   local side = V.side_number
    if not recruitLists[side] then
       recruitLists[side] = RecruitList:new()
    end
 end
 
+--Remove one instance of V.unit.type from the current side's RecruitList.
 local function removeType()
    confirmList()
-   recruitLists[WV.side_number]:remove()
+   recruitLists[V.side_number]:remove()
 end
 
+--Sets the maximum size for recruit lists. Will not be preserved in savegames
+--unless used in a preload event.
+--n: Number of slots.
 wesnoth.register_wml_action(
    'set_recruit_list_size',
    function(cfg)
       recruitListSize = cfg.n
-   end
-)
+   end)
 
+--Fills the empty slots in the current side's recruit list with random unit
+--types.
 wesnoth.register_wml_action(
    'fill_recruit_list',
    function()
       confirmList()
-      recruitLists[WV.side_number]:fill()
-   end
-)
+      recruitLists[V.side_number]:fill()
+   end)
 
+--Removes one instance of unit.type from the current side's recruit list.
 wesnoth.register_wml_action('remove_type', removeType)
 
+--Removes one instance of unit.type from the current side's recruit list and
+--refills the list.
 wesnoth.register_wml_action(
    'replace_type',
    function()
       removeType()
-      recruitLists[WV.side_number]:fill()
-   end
-)
+      recruitLists[V.side_number]:fill()
+   end)
+
+--Shows a message telling the player exactly what is in their Lua-defined
+--recruit list. Useful for finding out which, if any, unit type has been
+--duplicated.
+wesnoth.register_wml_action(
+   'show_recruit_list',
+   function()
+      side = V.side_number
+      W.message{side_for = side, message = tostring(recruitLists[side])}
+   end)

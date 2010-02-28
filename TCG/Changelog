@@ -1,3 +1,7 @@
+0.5.1
+	Added comments.
+	Added menu option to let player see the Lua-based recruit list.
+
 0.5.0
 	Made the default leader Random.
 	Leader list consists of 100 gold and level 5 units.
