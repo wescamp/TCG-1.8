@@ -1,4 +1,4 @@
---TCG.lua - Provides tags for use in TCG eras
+--TCG.lua
 
 H = wesnoth.require "lua/helper.lua"
 
@@ -263,6 +263,12 @@ function RecruitList:fill()
    self:set()
 end
 
+--Translates the name of the unit type.
+--id: Unit type id.
+local function translateUnitName(id)
+   return wesnoth.get_unit_type(id).name
+end
+
 --Removes one instance of V.unit.type from self.
 --i: Used only in recursion.
 function RecruitList:remove(i)
@@ -270,7 +276,8 @@ function RecruitList:remove(i)
    local type = V.unit.type
    if i < 1 then
       wesnoth.message(
-	 'TCG: RecruitList:remove: ' .. type .. _' not on recruit list')
+	 'TCG: RecruitList:remove: ' .. translateUnitName(type) ..
+	 _' not on recruit list')
    elseif self[i] == type then
       self[i] = nil
       self:set()
@@ -282,7 +289,10 @@ end
 function RecruitList:__tostring()
    local result = ''
    for i = 1, V.recruitListSize do
-      local type = self[i] or ''
+      local type = ''
+      if self[i] then
+	 type = translateUnitName(self[i])
+      end
       result = result .. i .. ': ' .. type .. "\n"
    end
    return result
@@ -319,14 +329,17 @@ end
 function Map:countCastle(hex)
    local x = hex.x
    local y = hex.y
-   if self[x][y] or not wesnoth.get_terrain_info(hex.terrain).castle then
+   if self[x][y] then
       return 0
    else
       self[x][y] = true
       local hexes = getLocations{
 	 x = x,
 	 y = y,
-	 radius = 1
+	 radius = 1,
+	 T.filter_radius{
+	    terrain = 'K*,C*'
+	 }
       }
       local result = 1
       for i, h in ipairs(hexes) do
@@ -352,12 +365,20 @@ local function removeType()
    recruitLists[V.side_number]:remove()
 end
 
+--Returns a string representing a range from 1 to n.
+--n: The maximum value of the range.
+local function range(n)
+   return '1-' .. n
+end
+
 --Returns the recruitment capacity of the largest castle.
 local function biggestCastle()
-   keeps = getLocations{
-      terrain = 'K*'
-   }
    local map = Map:new()
+   keeps = getLocations{
+      terrain = 'K*',
+      x = range(map.xMax),
+      y = range(map.yMax)
+   }
    local result = 0
    for i, hex in ipairs(keeps) do
       result = math.max(result, map:countCastle(hex) - 1)

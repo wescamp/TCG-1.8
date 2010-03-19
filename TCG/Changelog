@@ -1,4 +1,11 @@
-0.6.0
+0.6.2-beta3
+	The command "Show actual recruit list" should now show translated unit
+	names.
+
+0.6.1-beta2
+	TCG Castle no longer breaks when a keep is on the border.
+
+0.6.0-beta1
 	Added TCG Castle era.
 
 0.5.1
