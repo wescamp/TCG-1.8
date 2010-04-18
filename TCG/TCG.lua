@@ -4,12 +4,16 @@ H = wesnoth.require "lua/helper.lua"
 
 --WML constructs
 W = H.set_wml_action_metatable{} --Treats tags as callable functions.
-T = H.set_wml_tag_metatable{} --For subtags
+T = H.set_wml_tag_metatable{} --For subtags.
 V = H.set_wml_var_metatable{} --Contains WML variables.
 
 _ = wesnoth.textdomain "tcg"
 
 local unitTypeList = {
+
+   --Core--
+
+   --0
    'Vampire Bat',
    'Goblin Spearman',
    'Peasant',
@@ -17,6 +21,8 @@ local unitTypeList = {
    'Woodsman',
    'Mudcrawler',
    'Walking Corpse',
+
+   --1
    'Blood Bat',
    'Drake Burner',
    'Drake Clasher',
@@ -72,6 +78,8 @@ local unitTypeList = {
    'Wolf',
    'Wolf Rider',
    'Wose',
+
+   --2
    'Dread Bat',
    'Drake Flare',
    'Fire Drake',
@@ -141,6 +149,8 @@ local unitTypeList = {
    'Goblin Knight',
    'Goblin Pillager',
    'Elder Wose',
+
+   --3
    'Drake Flameheart',
    'Inferno Drake',
    'Drake Warden',
@@ -202,6 +212,8 @@ local unitTypeList = {
    'Banebow',
    'Direwolf Rider',
    'Ancient Wose',
+
+   --4
    'Armageddon Drake',
    'Elvish Sylph',
    'Great Mage',
@@ -209,8 +221,99 @@ local unitTypeList = {
    'Yeti',
    'Ancient Lich',
    'Skeletal Dragon',
+
+   --5
    'Elder Mage',
    'Fire Dragon',
+
+   --RPG Creation Kit--
+
+   --0
+   'Ram',
+   'Tusklet',
+   'Elvish Villager',
+   'Goblin Axeman',
+   'Goblin Slave',
+   'Goblin Tamer',
+   'Initiate',
+   'Noble Squire',
+   'Noble Youth',
+   'Nobleman',
+   'Vagrant',
+   'Brute',
+   'Civilian',
+   'Farmhand',
+   'Rancher',
+   'Squire',
+   'Swampcrawler',
+   'Spirit',
+   'Walking Bones',
+   'Wose Sapling',
+
+   --1
+   'Arctic Wolf',
+   'Dog',
+   'Giant Ant',
+   'Giant Crow',
+   'Razorbird',
+   'Tusker',
+   'White Unicorn',
+   'Elvish Tracker',
+   'Goblin Chopper',
+   'Goblin Roc Rider',
+   'Druid Minor',
+   'Warrior Mage',
+   'Noble Fighter',
+   'Royal Fighter',
+   'Outcast',
+   'Cavalry Archer',
+   'Giant Swampcrawler',
+   'Silver Hydra',
+   'Naga Archer',
+   'Orcish Shaman',
+   'Mkodo Stalk',
+   'Troll Dabbler',
+
+   --2
+   'Gorer',
+   'Goblin Roc Master',
+   'Avatar',
+   'Druid',
+   'Witch',
+   'Noble Commander',
+   'Princess',
+   'Royal Commander',
+   'Outcast Lady',
+   'Cockatrice',
+   'Green Hydra',
+   'Orcish Warlock',
+   'Orcish Witch Doctor',
+   'Mkodo Tree',
+   'Troll Firethrower',
+   'Death Baron',
+   'Skeleton Rider',
+   'Sorcerer Warrior',
+   'Wose Shaman',
+
+   --3
+   'Dire Wolf',
+   'Druid Elder',
+   'Battle Princess',
+   'Noble Lord',
+   'Queen',
+   'Royal Lord',
+   'Outcast Leader',
+   'Captain',
+   'Black Hydra',
+   'Naga Abomination',
+   'Troll Boulderlobber',
+   'Troll Firemaster',
+   'Necromancer Warrior',
+
+   --4
+   'Orcish Champion',
+   'Arch Necromancer'
+
 }
 
 --This is a proxy for Wesnoth's recruit list that has a fixed length and allows
@@ -221,19 +324,18 @@ local RecruitList = {}
 --If this is a savegame, restores data from WML variables. Otherwise, all
 --entries will be nil.
 function RecruitList:new()
-   local list = {}
-   setmetatable(list, self)
+   local o = {}
+   setmetatable(o, self)
    self.__index = self
-   local side = V.side_number
    for i = 1, V.recruitListSize do
-      list[i] = V['recruitList' .. side .. '_' .. i]
+      o[i] = V['recruitList' .. wesnoth.current.side .. '_' .. i]
    end
-   return list
+   return o
 end
 
 --Copies self to the Wesnoth recruit list and to WML variables.
 function RecruitList:set()
-   local side = V.side_number
+   local side = wesnoth.current.side
    local recruit = ''
    for i = 1, V.recruitListSize do
       local type = self[i]
@@ -249,17 +351,18 @@ function RecruitList:set()
 end
 
 --Fills all empty slots with randomly selected types from unitTypeList.
+--Obliterates: v
 function RecruitList:fill()
    for i = 1, V.recruitListSize do
       if not self[i] then
 	 W.set_variable{
-	    name = 'typeN',
+	    name = 'v',
 	    rand = '1..' .. #unitTypeList
 	 }
-	 self[i] = unitTypeList[V.typeN]
+	 self[i] = unitTypeList[V.v]
       end
    end
-   V.typeN = nil
+   V.v = nil
    self:set()
 end
 
@@ -300,9 +403,10 @@ end
 
 --Returns an array of hexes.
 --wml: WML table to send to the [store_locations] tag. (The variable is
---automatically provided and will be cleared after use.)
+--automatically provided.)
+--Obliterates: v
 local function getLocations(wml)
-   wml.variable = 'hexes'
+   wml.variable = 'v'
    W.store_locations(wml)
    local hexes = H.get_variable_array(wml.variable)
    V[wml.variable] = nil
@@ -314,14 +418,14 @@ end
 local Map = {}
 
 function Map:new()
-   local map = {}
-   setmetatable(map, self)
+   local o = {}
+   setmetatable(o, self)
    self.__index = self
-   map.xMax, map.yMax = wesnoth.get_map_size()
-   for i = 1, map.xMax do
-      map[i] = {}
+   o.xMax, o.yMax = wesnoth.get_map_size()
+   for i = 1, o.xMax do
+      o[i] = {}
    end
-   return map
+   return o
 end
 
 --Counts the tiles in the castle that hex is in.
@@ -353,7 +457,7 @@ local recruitLists = {}
 
 --If the current side doesn't have a RecruitList, make a new one.
 local function confirmList()
-   local side = V.side_number
+   local side = wesnoth.current.side
    if not recruitLists[side] then
       recruitLists[side] = RecruitList:new()
    end
@@ -362,7 +466,7 @@ end
 --Remove one instance of V.unit.type from the current side's RecruitList.
 local function removeType()
    confirmList()
-   recruitLists[V.side_number]:remove()
+   recruitLists[wesnoth.current.side]:remove()
 end
 
 --Returns a string representing a range from 1 to n.
@@ -386,13 +490,12 @@ local function biggestCastle()
    return result
 end
 
---Sets the maximum size for recruit lists. Will not be preserved in savegames
---unless used in a preload event.
+--Sets the maximum size for recruit lists.
 --n: Number of slots. Default is the biggest castle size on the map.
 wesnoth.register_wml_action(
    'set_recruit_list_size',
    function(cfg)
-      V.recruitListSize = cfg.n or biggestCastle()
+      V.recruitListSize = tonumber(cfg.n) or biggestCastle()
    end)
 
 --Fills the empty slots in the current side's recruit list with random unit
@@ -401,7 +504,7 @@ wesnoth.register_wml_action(
    'fill_recruit_list',
    function()
       confirmList()
-      recruitLists[V.side_number]:fill()
+      recruitLists[wesnoth.current.side]:fill()
    end)
 
 --Removes one instance of unit.type from the current side's recruit list.
@@ -413,33 +516,17 @@ wesnoth.register_wml_action(
    'replace_type',
    function()
       removeType()
-      recruitLists[V.side_number]:fill()
+      recruitLists[wesnoth.current.side]:fill()
    end)
 
-local idShowRecruit = 'show_recruit'
-
---Shows recruit list to the player.
+--Tells the player exactly what is in their Lua-defined recruit list. Useful for
+--finding out which unit type, if any, has been duplicated.
 wesnoth.register_wml_action(
-   idShowRecruit,
+   'show_recruit',
    function()
-      local side = V.side_number
+      local side = wesnoth.current.side
       W.message{
 	 side_for = side,
 	 message = tostring(recruitLists[side])
-      }
-   end)
-
---Sets a menu item that tells the player exactly what is in their Lua-defined
---recruit list. Useful for finding out which unit type, if any, has been
---duplicated.
-wesnoth.register_wml_action(
-   'menu_' .. idShowRecruit,
-   function()
-      W.set_menu_item{
-	 id = idShowRecruit,
-	 description = _'Show actual recruit list',
-	 T.command{
-	    T[idShowRecruit]{}
-	 }
       }
    end)
