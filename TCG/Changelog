@@ -1,5 +1,14 @@
+1.2.1
+	Added Devlings from Era of Myths.
+
+1.2.0
+	Recruits are now stored directly to WML variables instead of copying
+	themselves to WML variables.
+	Added Celestials from Era of Myths.
+	The speaker for the "actual recruit list" is now 'narrator'.
+
 1.1.0
-	Added RPG Creation Kit bestiery.
+	Added RPG Creation Kit bestiary.
 
 1.0.0
 	Rearranged some code.

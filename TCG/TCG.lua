@@ -312,91 +312,131 @@ local unitTypeList = {
 
    --4
    'Orcish Champion',
-   'Arch Necromancer'
+   'Arch Necromancer',
+
+   --Era of Myths--
+
+   --0
+   'EOM_Sneak',
+
+   --1
+   'EOM_Crusader',
+   'EOM_Legionnaire',
+   'EOM_Light_Spirit',
+   'EOM_Messenger',
+   'EOM_Wizard',
+   'EOM_Zealot',
+   'EOM_Flappers',
+   'EOM_Nailers',
+   'EOM_Overgrown_Devling',
+   'EOM_Lurker',
+   'EOM_Cursers',
+
+   --2
+   'EOM_Divine_Knight',
+   'EOM_Protector',
+   'EOM_Quester',
+   'EOM_Keeper',
+   'EOM_Lantern_Archon',
+   'EOM_Claimant',
+   'EOM_Great_Wizard',
+   'EOM_Mystic',
+   'EOM_Militant',
+   'EOM_Flyers',
+   'EOM_Spikers',
+   'EOM_Devling_Soldier',
+   'EOM_Devling_Warrior',
+   'EOM_Blasphemists',
+
+   --3
+   'EOM_Divine_Champion',
+   'EOM_Holy_Sentinel',
+   'EOM_Sentinel',
+   'EOM_Master_of_Light',
+   'EOM_Herald',
+   'EOM_Prophet',
+   'EOM_Sage',
+   'EOM_Sicarius',
+   'EOM_Attackers',
+   'EOM_Staplers',
+   'EOM_Devling_Chief',
+   'EOM_Devling_Hero',
+   'EOM_Offenders',
+
+   --4
+   'EOM_Seraph',
+   'EOM_Abusers'
 
 }
 
---This is a proxy for Wesnoth's recruit list that has a fixed length and allows
---duplicates. Every time it changes, it will be copied to the current side's
---real recruit list and to WML variables.
-local RecruitList = {}
-
---If this is a savegame, restores data from WML variables. Otherwise, all
---entries will be nil.
-function RecruitList:new()
-   local o = {}
-   setmetatable(o, self)
-   self.__index = self
-   for i = 1, V.recruitListSize do
-      o[i] = V['recruitList' .. wesnoth.current.side .. '_' .. i]
-   end
-   return o
+local function recruitVariable(i)
+   return 'recruit' .. wesnoth.current.side .. '_' .. i
 end
 
---Copies self to the Wesnoth recruit list and to WML variables.
-function RecruitList:set()
-   local side = wesnoth.current.side
+local function getRecruit(i)
+   return V[recruitVariable(i)]
+end
+
+local function setRecruit(i, type)
+   V[recruitVariable(i)] = type
+end
+
+--Copies the internal recruit list to the real recruit list.
+local function setRecruitList()
    local recruit = ''
    for i = 1, V.recruitListSize do
-      local type = self[i]
-      V['recruitList' .. side .. '_' .. i] = type
+      local type = getRecruit(i)
       if type then
 	 recruit = recruit .. type .. ','
       end
    end
    W.set_recruit{
-      side = side,
+      side = wesnoth.current.side,
       recruit = recruit
    }
 end
 
 --Fills all empty slots with randomly selected types from unitTypeList.
 --Obliterates: v
-function RecruitList:fill()
+local function fillRecruitList()
    for i = 1, V.recruitListSize do
-      if not self[i] then
+      if not getRecruit(i) then
 	 W.set_variable{
 	    name = 'v',
 	    rand = '1..' .. #unitTypeList
 	 }
-	 self[i] = unitTypeList[V.v]
+	 setRecruit(i, unitTypeList[V.v])
       end
    end
    V.v = nil
-   self:set()
+   setRecruitList()
 end
 
 --Translates the name of the unit type.
 --id: Unit type id.
-local function translateUnitName(id)
-   return wesnoth.get_unit_type(id).name
-end
-
---Removes one instance of V.unit.type from self.
---i: Used only in recursion.
-function RecruitList:remove(i)
-   i = i or V.recruitListSize
-   local type = V.unit.type
-   if i < 1 then
-      wesnoth.message(
-	 'TCG: RecruitList:remove: ' .. translateUnitName(type) ..
-	 _' not on recruit list')
-   elseif self[i] == type then
-      self[i] = nil
-      self:set()
+local function translateUnitType(id)
+   if id then
+      return wesnoth.get_unit_type(id).name
    else
-      self:remove(i - 1)
+      return ''
    end
 end
 
-function RecruitList:__tostring()
+--Removes the last instance of V.unit.type from the recruit list.
+local function removeType()
+   for i = V.recruitListSize, 1, -1 do
+      if getRecruit(i) == V.unit.type then
+	 setRecruit(i)
+	 setRecruitList()
+	 break
+      end
+   end
+end
+
+local function recruitListString()
    local result = ''
    for i = 1, V.recruitListSize do
-      local type = ''
-      if self[i] then
-	 type = translateUnitName(self[i])
-      end
-      result = result .. i .. ': ' .. type .. "\n"
+      result = result .. i .. ': ' .. translateUnitType(getRecruit(i)) .. "\n"
    end
    return result
 end
@@ -453,26 +493,10 @@ function Map:countCastle(hex)
    end
 end
 
-local recruitLists = {}
-
---If the current side doesn't have a RecruitList, make a new one.
-local function confirmList()
-   local side = wesnoth.current.side
-   if not recruitLists[side] then
-      recruitLists[side] = RecruitList:new()
-   end
-end
-
---Remove one instance of V.unit.type from the current side's RecruitList.
-local function removeType()
-   confirmList()
-   recruitLists[wesnoth.current.side]:remove()
-end
-
 --Returns a string representing a range from 1 to n.
 --n: The maximum value of the range.
 local function range(n)
-   return '1-' .. n
+    return '1-' .. n
 end
 
 --Returns the recruitment capacity of the largest castle.
@@ -495,19 +519,16 @@ end
 wesnoth.register_wml_action(
    'set_recruit_list_size',
    function(cfg)
+      --This tag may be called from outside the preload event, so we store this
+      --in V.
       V.recruitListSize = tonumber(cfg.n) or biggestCastle()
    end)
 
 --Fills the empty slots in the current side's recruit list with random unit
 --types.
-wesnoth.register_wml_action(
-   'fill_recruit_list',
-   function()
-      confirmList()
-      recruitLists[wesnoth.current.side]:fill()
-   end)
+wesnoth.register_wml_action('fill_recruit_list', fillRecruitList)
 
---Removes one instance of unit.type from the current side's recruit list.
+--Removes the last instance of unit.type from the current side's recruit list.
 wesnoth.register_wml_action('remove_type', removeType)
 
 --Removes one instance of unit.type from the current side's recruit list and
@@ -516,7 +537,7 @@ wesnoth.register_wml_action(
    'replace_type',
    function()
       removeType()
-      recruitLists[wesnoth.current.side]:fill()
+      fillRecruitList()
    end)
 
 --Tells the player exactly what is in their Lua-defined recruit list. Useful for
@@ -524,9 +545,9 @@ wesnoth.register_wml_action(
 wesnoth.register_wml_action(
    'show_recruit',
    function()
-      local side = wesnoth.current.side
       W.message{
-	 side_for = side,
-	 message = tostring(recruitLists[side])
+	 speaker = 'narrator',
+	 side_for = wesnoth.current.side,
+	 message = recruitListString()
       }
    end)
