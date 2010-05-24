@@ -321,6 +321,7 @@ local unitTypeList = {
     'EOM_Air',
     'EOM_Bloodborn',
     'EOM_Wolf_Cub',
+    'EOM_Sky_Shard',
 
     --1
     'EOM_Crusader',
@@ -360,6 +361,12 @@ local unitTypeList = {
     'EOM_Fire_Sprite',
     'EOM_Blackfur',
     'EOM_Water_Dryad',
+    'EOM_Courier',
+    'EOM_Sky_Crystal',
+    'EOM_Weaver',
+    'EOM_Seeker',
+    'EOM_Gatekeeper',
+    'EOM_Scribe',
 
     --2
     'EOM_Divine_Knight',
@@ -410,6 +417,15 @@ local unitTypeList = {
     'EOM_Flame_Sprite',
     'EOM_Black_Hunter',
     'EOM_Water_Nymph',
+    'EOM_Emissary',
+    'EOM_Reaver',
+    'EOM_Envoy',
+    'EOM_Prophetess',
+    'EOM_Pathfinder',
+    'EOM_Skyrunner',
+    'EOM_Heretic',
+    'EOM_Lorekeeper',
+    'EOM_Savant',
 
     --3
     'EOM_Divine_Champion',
@@ -453,28 +469,43 @@ local unitTypeList = {
     'EOM_Pack_Leader',
     'EOM_Flame_Spirit',
     'EOM_Water_Shyde',
+    'EOM_Reaver',
+    'EOM_Ascendant',
+    'EOM_Windsong_Herald',
+    'EOM_Farstrider',
+    'EOM_Stormbringer',
+    'EOM_Harbinger',
+    'EOM_Oathkeeper',
+    'EOM_Arbiter',
+    'EOM_Runeforger',
 
     --4
     'EOM_Seraph',
     'EOM_Abusers',
     'EOM_Methusalem',
-    'EOM_Garou'
+    'EOM_Garou',
+    'EOM_Librarian',
 
 }
 
-local function getRecruit(i)
+--This is an interface to the WML variables that store the recruit lists.
+local recruitList = {}
+
+function recruitList.__newindex(t, i, type)
+    V.recruits[wesnoth.current.side]['_'..i] = type
+end
+
+function recruitList.__index(t, i)
     return V.recruits[wesnoth.current.side]['_'..i]
 end
 
-local function setRecruit(i, type)
-    V.recruits[wesnoth.current.side]['_'..i] = type
-end
+setmetatable(recruitList, recruitList)
 
 --Copies the internal recruit list to the real recruit list.
 local function setRecruitList()
     local recruit = ''
     for i = 1, V.recruitListSize do
-	local type = getRecruit(i)
+	local type = recruitList[i]
 	if type then
 	    recruit = recruit .. type .. ','
 	end
@@ -489,45 +520,27 @@ end
 --Obliterates: v
 local function fillRecruitList()
     for i = 1, V.recruitListSize do
-	if not getRecruit(i) then
+	if not recruitList[i] then
 	    W.set_variable{
 		name = 'v',
 		rand = '1..' .. #unitTypeList
 	    }
-	    setRecruit(i, unitTypeList[V.v])
+	    recruitList[i] = unitTypeList[V.v]
 	end
     end
     V.v = nil
     setRecruitList()
 end
 
---Translates the name of the unit type.
---id: Unit type id.
-local function translateUnitType(id)
-    if id then
-	return wesnoth.get_unit_type(id).name
-    else
-	return ''
-    end
-end
-
 --Removes the last instance of V.unit.type from the recruit list.
 local function removeType()
     for i = V.recruitListSize, 1, -1 do
-	if getRecruit(i) == V.unit.type then
-	    setRecruit(i)
+	if recruitList[i] == V.unit.type then
+	    recruitList[i] = nil
 	    setRecruitList()
 	    break
 	end
     end
-end
-
-local function recruitListString()
-    local result = ''
-    for i = 1, V.recruitListSize do
-	result = result .. i .. ': ' .. translateUnitType(getRecruit(i)) .. "\n"
-    end
-    return result
 end
 
 --Returns an array of hexes.
@@ -582,23 +595,23 @@ function Map:countCastle(hex)
     end
 end
 
---Returns a string representing a range from 1 to n.
---n: The maximum value of the range.
-local function range(n)
-    return '1-' .. n
-end
-
 --Returns the recruitment capacity of the largest castle.
-local function biggestCastle()
-    local map = Map:new()
+function Map:biggestCastle()
+
+    --Returns a string representing a range from 1 to n.
+    --n: The maximum value of the range.
+    local function range(n)
+	return '1-' .. n
+    end
+
     keeps = getLocations{
 	terrain = 'K*',
-	x = range(map.xMax),
-	y = range(map.yMax)
+	x = range(self.xMax),
+	y = range(self.yMax)
     }
     local result = 0
     for i, hex in ipairs(keeps) do
-	result = math.max(result, map:countCastle(hex) - 1)
+	result = math.max(result, self:countCastle(hex) - 1)
     end
     return result
 end
@@ -608,7 +621,13 @@ end
 wesnoth.register_wml_action(
     'tcg_init',
     function(cfg)
-	V.recruitListSize = tonumber(cfg.size) or biggestCastle()
+	size = tonumber(cfg.size)
+	if size then
+	    V.recruitListSize = size
+	else
+	    local map = Map:new()
+	    V.recruitListSize = map:biggestCastle()
+	end
 	V.recruits = {}
 	local i = 1
 	while wesnoth.get_side(i) do
@@ -638,9 +657,17 @@ wesnoth.register_wml_action(
 wesnoth.register_wml_action(
     'show_recruit',
     function()
+	local message = ''
+	for i = 1, V.recruitListSize do
+	    local type = ''
+	    if recruitList[i] then
+		type = wesnoth.get_unit_type(recruitList[i]).name
+	    end
+	    message = message..i..': '..type.."\n"
+	end
 	W.message{
 	    speaker = 'narrator',
 	    side_for = wesnoth.current.side,
-	    message = recruitListString()
+	    message = message
 	}
     end)

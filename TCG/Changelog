@@ -1,3 +1,8 @@
+1.2.6
+	Use a metatable to interface with the recruits stored in WML variables.
+	Added Windsong. (Era of Myths expansion is now complete.)
+	Added Arch Necromancer as a leader.
+
 1.2.5
 	Added Vampires and Wargs from Era of Myths.
 
